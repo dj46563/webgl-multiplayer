@@ -54,9 +54,6 @@ namespace Example
             Console.WriteLine("Connection closed: " + ID);
             Array.Clear(_buffer, 0, _buffer.Length);
             _buffer[0] = 4;
-            byte[] idBytes = _encoding.GetBytes(ID);
-            idBytes.CopyTo(_buffer, 1);
-            Sessions.Broadcast(_buffer);
         }
     }
 

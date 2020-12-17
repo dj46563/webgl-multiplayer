@@ -19,6 +19,7 @@ public class TransformSync : MonoBehaviour
     public GameObject PlayerPrefab;
     private Transform _ownedTransform;
     private Dictionary<string, Transform> otherPlayers = new Dictionary<string, Transform>();
+    private string _ownedId;
     
     private BoundedRange[] worldBounds = new BoundedRange[3]
     {
@@ -47,6 +48,7 @@ public class TransformSync : MonoBehaviour
             case 1:
             {
                 string id = _encoding.GetString(data, 1, 32);
+                _ownedId = id;
                 Debug.Log("Create owner " + id);
                 GameObject player = Instantiate(PlayerPrefab);
                 _ownedTransform = player.transform;
@@ -58,7 +60,7 @@ public class TransformSync : MonoBehaviour
             {
                 string id = _encoding.GetString(data, 1, 32);
                 Debug.Log("Create non owner " + id);
-                otherPlayers[id] = Instantiate(PlayerPrefab).transform;
+                otherPlayers[id] = CreatePlayer();
                 break;
             }
             case 3:
@@ -67,6 +69,7 @@ public class TransformSync : MonoBehaviour
                 for (int i = 0; i < count; i++)
                 {
                     string id = _bitBuffer.ReadString();
+
                     QuantizedVector3 quantizedPosition = new QuantizedVector3(
                         _bitBuffer.ReadUInt(),
                         _bitBuffer.ReadUInt(),
@@ -74,10 +77,27 @@ public class TransformSync : MonoBehaviour
                     );
                     Vector3 postion = BoundedRange.Dequantize(quantizedPosition, worldBounds);
 
-                    if (otherPlayers.ContainsKey(id))
+                    // Don't create players or set positions if its for the owned player
+                    if (id != _ownedId)
                     {
+                        if (!otherPlayers.ContainsKey(id))
+                        {
+                            otherPlayers[id] = CreatePlayer();
+                        }
                         otherPlayers[id].position = postion;
                     }
+                }
+
+                break;
+            }
+            case 4:
+            {
+                string id = _encoding.GetString(data, 1, 32);
+                Debug.Log("Delete " + id);
+                if (otherPlayers.ContainsKey(id))
+                {
+                    Destroy(otherPlayers[id].gameObject);
+                    otherPlayers.Remove(id);
                 }
 
                 break;
@@ -109,5 +129,10 @@ public class TransformSync : MonoBehaviour
             .AddUInt(quantizedPosition.z)
             .ToArray(buffer);
         _ws.Send(buffer);
+    }
+
+    private Transform CreatePlayer()
+    {
+        return Instantiate(PlayerPrefab).transform;
     }
 }
